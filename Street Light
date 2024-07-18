@@ -1,0 +1,104 @@
+#include <WiFi.h>
+#include <PubSubClient.h>
+
+const char* ssid = "project";
+const char* password = "project@123";
+const char* mqttServer = "103.217.220.20";
+const int mqttPort = 1883;
+// const char* mqttUser = "your_mqtt_username";
+// const char* mqttPassword = "your_mqtt_password";
+const int loopWirePin1 = 34;  // Analog pin for loop wire 1
+const int loopWirePin2 = 35;  // Analog pin for loop wire 2
+const int loopWirePin3 = 36;  // Analog pin for loop wire 3
+
+const int threshold = 1500;    // Adjust this threshold based on your setup
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+void setup_wifi() {
+  delay(10);
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.println("IP address: ");
+  Serial.println(WiFi.localIP());
+}
+
+void callback(char* topic, byte* payload, unsigned int length) {
+  // Handle incoming messages here
+}
+
+void reconnect() {
+  while (!client.connected()) {
+    Serial.print("Attempting MQTT connection...");
+    if (client.connect("ESP32Client")) {
+      Serial.println("connected");
+    } else {
+      Serial.print("failed, rc=");
+      Serial.print(client.state());
+      Serial.println(" try again in 5 seconds");
+      delay(5000);
+    }
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  setup_wifi();
+  client.setServer(mqttServer, mqttPort);
+  client.setCallback(callback);
+}
+
+void loop() {
+  if (!client.connected()) {
+    reconnect();
+  }
+  client.loop();
+
+  int loopVoltage1 = analogRead(loopWirePin1);
+  int loopVoltage2 = analogRead(loopWirePin2);
+  int loopVoltage3 = analogRead(loopWirePin3);
+
+  // Print the raw analog readings for reference
+  Serial.print("Loop 1 Voltage: ");
+  Serial.println(loopVoltage1);
+  Serial.print("Loop 2 Voltage: ");
+  Serial.println(loopVoltage2);
+  Serial.print("Loop 3 Voltage: ");
+  Serial.println(loopVoltage3);
+
+  // Check if any of the loop voltages is below the threshold
+  if (loopVoltage1 < threshold) {
+    Serial.println("Power cut detected in Loop 1!");
+    client.publish("pole1_status", "Not Working");
+   } else {
+    client.publish("pole1_status", "Working");
+  }
+
+  if (loopVoltage2 < threshold) {
+    Serial.println("Power cut detected in Loop 2!");
+    client.publish("pole2_status", "Not Working");
+    } else {
+    client.publish("pole2_status", "Working");
+  }
+
+  if (loopVoltage3 < threshold) {
+    Serial.println("Power cut detected in Loop 3!");
+    client.publish("pole3_status", "Not Working");
+    } else {
+    client.publish("pole3_status", "Working");
+  }
+
+  delay(5000);  // Adjust delay based on your application
+}
